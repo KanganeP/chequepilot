@@ -11,136 +11,155 @@ from PIL import Image
 
 pytesseract.pytesseract.tesseract_cmd = r'.\Tesseract-OCR\tesseract.exe'
 
-def get_bank_name(cropped_img)-> str:
-    """
-    This function takes the image as an input, extracts the text from the image and returns the string
-    
-    parameters
-    ----------
-    
-    cropped_img: array 
-                Image from which the text needs to be extracted. 
-    
-    
-    Returns
-    -------
-    str
-       The string extracted from the input image
-    """
-    # temp_path = 'temp_cropped_image.jpg'
-    # cv2.imwrite(temp_path,cropped_img)
-    # image = Image.open(temp_path)
-    result1 = pytesseract.image_to_string(cropped_img,lang="eng")
+def preprocess_image(img):
+    # Convert RGB to Gray
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
-    _, bw_image = cv2.threshold(cropped_img, 128, 255, cv2.THRESH_BINARY)
-    result2 = pytesseract.image_to_string(bw_image,lang="eng")
-    
-    result = max([result1,result2], key=len) 
-    bnk_nam=result.replace(' ','')
-    return bnk_nam
+    # Enlarge image
+    gray = cv2.resize(
+        gray,
+        None,
+        fx=3,
+        fy=3,
+        interpolation=cv2.INTER_CUBIC
+    )
 
+    # Remove noise
+    gray = cv2.GaussianBlur(gray, (3,3), 0)
 
-def get_ifsc_code(cropped_img)-> str:
-    """
-    This function takes the image as an input, extracts the text from the image and returns the string
+    # Threshold
+    gray = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )[1]
     
-    parameters
-    ----------
-    
-    cropped_img: array 
-                Image from which the text needs to be extracted. 
-    
-    
-    Returns
-    -------
-    str
-       The string extracted from the input image
-    """    
-    # temp_path = 'temp_cropped_image.jpg'
-    # cv2.imwrite(temp_path,cropped_img)
-    # temp_path = 'temp_cropped_image1.jpg'
-    # cv2.imwrite(temp_path,cropped_img)
-    # image = Image.open(temp_path)
-    result = pytesseract.image_to_string(cropped_img,lang="eng")
-    c=result.replace(' ','').replace('\n','').replace(':',' ').replace('-',' ').upper()
-    print("===>>>",c)
-    ifsc_no=re.findall(r'([A-Z0-9]{11})',c)
-    if len(ifsc_no)==0:
-        ifsc_no=re.findall(r'([A-Z0-9]{10})',c)
-    # if len(ifsc_no)==0:
-    #     ifsc_no=re.findall(r'([A-Z]{10})',c)
-    if len(ifsc_no)==0:
-        ifsc_no=re.findall(r'([A-Z0-9]{09})',c)
-    if len(ifsc_no)>0:
-        ifsc_no=ifsc_no[-1]
-    return ifsc_no
+    cv2.imwrite(
+    "output/debug_preprocessed.jpg",
+    gray
+)
 
+    return gray
 
-def get_accnt_no(cropped_img)-> str:
-    """
-    This function takes the image as an input, extracts the text from the image and returns the string
-    
-    parameters
-    ----------
-    
-    cropped_img: array 
-                Image from which the text needs to be extracted. 
-    
-    
-    Returns
-    -------
-    str
-       The string extracted from the input image
-    """
-    # temp_path = 'temp_cropped_image.jpg'
-    # cv2.imwrite(temp_path,cropped_img)
-    # image = Image.open(temp_path)
-    result1 = pytesseract.image_to_string(cropped_img,lang="eng")
-    c=result1.replace(' ','')
-    e=re.findall('[0-9]*',c)
-    acc_no1 = max(e, key=len)
+def get_bank_name(cropped_img):
 
-    _, bw_image = cv2.threshold(cropped_img, 128, 255, cv2.THRESH_BINARY)
-    
-    result2 = pytesseract.image_to_string(bw_image,lang="eng")
-    c=result2.replace(' ','')
-    e=re.findall('[0-9]*',c)
-    acc_no2 = max(e, key=len)
-    
+    img = preprocess_image(cropped_img)
 
-    
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 7"
+    )
 
-    
-    acc_no = max([acc_no1,acc_no2], key=len)
-    
-            
-    return acc_no
+    text = re.sub(r'[^A-Za-z ]', '', text)
+    text = text.strip().upper()
 
+    print("Bank Name:", text)
 
-def get_cheque_number(cropped_img)-> str:
-    """
-    This function takes the image as an input, extracts the text from the image and returns the string
-    
-    parameters
-    ----------
-    
-    cropped_img: array 
-                Image from which the text needs to be extracted. 
-    
-    
-    Returns
-    -------
-    str
-       The string extracted from the input image
-    """
-    # temp_path = 'temp_cropped_image.jpg'
-    # cv2.imwrite(temp_path,cropped_img)
-    # image = Image.open(temp_path)
-    result = pytesseract.image_to_string(cropped_img,lang="mcr")
-    c=result.replace(' ','')
-    e=re.findall('[0-9]*',c)
-    cheq_no = max(e, key=len)
-    return cheq_no
+    return text
+
+def get_ifsc_code(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 7"
+    )
+
+    text = text.replace(" ", "")
+    text = text.replace("\n", "")
+    text = text.upper()
+
+    print("OCR IFSC:", text)
+
+    match = re.search(
+        r"[A-Z]{4}0[A-Z0-9]{6}",
+        text
+    )
+
+    if match:
+        return match.group()
+
+    return ""
+
+def get_accnt_no(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 7 outputbase digits"
+    )
+
+    print("OCR Account:", text)
+
+    numbers = re.findall(r"\d+", text)
+
+    if numbers:
+        return max(numbers, key=len)
+
+    return ""
+
+def get_cheque_number(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="mcr",
+        config="--psm 7"
+    )
+
+    print("OCR Cheque:", text)
+
+    numbers = re.findall(r"\d+", text)
+
+    if numbers:
+        return max(numbers, key=len)
+
+    return ""
+
+def get_amount(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 7"
+    )
+
+    print("OCR Amount:", text)
+
+    numbers = re.findall(r"\d+", text)
+
+    if numbers:
+        return "".join(numbers)
+
+    return ""
+
+def get_date(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 7"
+    )
+
+    print("OCR Date:", text)
+
+    numbers = re.findall(r"\d+", text)
+
+    if numbers:
+        return "".join(numbers)
+
+    return ""
 
 def get_bank_details(ifsc_code):
 

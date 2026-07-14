@@ -43,29 +43,24 @@ model=YOLO(model_path)
 razorpay_url = 'https://ifsc.razorpay.com/'
                 
                 
-                
+OUTPUT_DIR = "output"
+CROP_DIR = os.path.join(OUTPUT_DIR, "crops")
+DETECTION_DIR = os.path.join(OUTPUT_DIR, "detections")
+
+os.makedirs(CROP_DIR, exist_ok=True)
+os.makedirs(DETECTION_DIR, exist_ok=True)               
 
 
 
 # Serve React build files
-
-
 @app.post("/process/")
-async def process_cheque(
-    file: UploadFile = File(...)
-):
+async def process_cheque(file: UploadFile = File(...)):
     try:
 
-        # Read uploaded image
         image_bytes = await file.read()
-
-        image = Image.open(
-            BytesIO(image_bytes)
-        )
-
+        image = Image.open(BytesIO(image_bytes))
         image_array = np.array(image)
 
-        # Predict using YOLO
         pred_img = model.predict(
             source=image_array,
             verbose=False
@@ -76,6 +71,8 @@ async def process_cheque(
             cv2.COLOR_BGR2RGB
         )
 
+        draw_image = img_org.copy()
+
         bank_name = ""
         ifsc_code = ""
         account_number = ""
@@ -83,67 +80,109 @@ async def process_cheque(
 
         results = {}
 
-        for idx, cls in enumerate(
-            pred_img[0].boxes.cls
-        ):
+        for idx, cls in enumerate(pred_img[0].boxes.cls):
 
-            class_name = pred_img[0].names[
-                float(cls)
-            ]
+            class_name = pred_img[0].names[int(cls)]
 
-            confidence = float(
-                pred_img[0].boxes.conf[idx]
-            )
+            confidence = float(pred_img[0].boxes.conf[idx])
 
             if (
                 class_name not in results
-                or confidence >
-                results[class_name]["conf"]
+                or confidence > results[class_name]["conf"]
             ):
                 results[class_name] = {
                     "conf": confidence,
-                    "box":
-                    pred_img[0].boxes[idx]
+                    "box": pred_img[0].boxes[idx]
                 }
+
+        ocr_result = {}
+
+        # -------------------------
+        # Loop through detections
+        # -------------------------
 
         for class_name, value in results.items():
 
-            x1 = int(
-                value["box"].xyxy[0][0]
-            )
-            y1 = int(
-                value["box"].xyxy[0][1]
-            )
-            x2 = int(
-                value["box"].xyxy[0][2]
-            )
-            y2 = int(
-                value["box"].xyxy[0][3]
+            x1 = int(value["box"].xyxy[0][0])
+            y1 = int(value["box"].xyxy[0][1])
+            x2 = int(value["box"].xyxy[0][2])
+            y2 = int(value["box"].xyxy[0][3])
+
+            cv2.rectangle(
+                draw_image,
+                (x1, y1),
+                (x2, y2),
+                (0,255,0),
+                2
             )
 
-            crop = img_org[
-                y1:y2,
-                x1:x2
-            ]
+            cv2.putText(
+                draw_image,
+                class_name,
+                (x1, y1-10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255,0,0),
+                2
+            )
+
+            crop = img_org[y1:y2, x1:x2]
+
+            crop_path = os.path.join(
+                CROP_DIR,
+                f"{class_name}.jpg"
+            )
+
+            cv2.imwrite(
+                crop_path,
+                cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
+            )
+
+            print(f"Saved Crop : {crop_path}")
 
             if class_name == "bank_name":
-                bank_name = get_bank_name(crop)
+                text = get_bank_name(crop)
+                bank_name = text
 
             elif class_name == "ifsc_Code":
-                ifsc_code = get_ifsc_code(crop)
+                text = get_ifsc_code(crop)
+                ifsc_code = text
 
             elif class_name == "account_number":
-                account_number = get_accnt_no(crop)
+                text = get_accnt_no(crop)
+                account_number = text
 
             elif class_name == "cheque_number":
-                cheque_number = get_cheque_number(crop)
+                text = get_cheque_number(crop)
+                cheque_number = text
+
+            else:
+                text = ""
+
+            ocr_result[class_name] = text
+
+            print(class_name, "=>", text)
+
+        detection_path = os.path.join(
+            DETECTION_DIR,
+            "detected_cheque.jpg"
+        )
+
+        cv2.imwrite(
+            detection_path,
+            cv2.cvtColor(draw_image, cv2.COLOR_RGB2BGR)
+        )
+
+        print("Detection image saved:", detection_path)
 
         return {
             "success": True,
             "bankName": bank_name,
             "ifscCode": ifsc_code,
             "accountNumber": account_number,
-            "chequeNumber": cheque_number
+            "chequeNumber": cheque_number,
+            "ocrResult": ocr_result,
+            "detectionImage": detection_path
         }
 
     except Exception as e:
@@ -151,7 +190,6 @@ async def process_cheque(
             "success": False,
             "error": str(e)
         }
-
 
 
 @app.post("/get_bank_details/")
