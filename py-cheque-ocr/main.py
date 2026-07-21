@@ -16,9 +16,26 @@ import re
 import os
 import pandas as pd
 import requests
-from modules import get_bank_name,get_ifsc_code,get_accnt_no,get_cheque_number,get_bank_details
+from modules import (
+    get_bank_name,
+    get_ifsc_code,
+    get_accnt_no,
+    get_cheque_number,
+    get_amount,
+    get_date,
+    get_bank_address,
+    get_signature,
+    get_bank_details
+)
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+app.mount(
+    "/output",
+    StaticFiles(directory="output"),
+    name="output"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # Allow requests from frontend
@@ -77,6 +94,10 @@ async def process_cheque(file: UploadFile = File(...)):
         ifsc_code = ""
         account_number = ""
         cheque_number = ""
+        amount = ""
+        date = ""
+        bank_address = ""
+        signature = ""
 
         results = {}
 
@@ -156,11 +177,26 @@ async def process_cheque(file: UploadFile = File(...)):
                 text = get_cheque_number(crop)
                 cheque_number = text
 
+            elif class_name == "amount":
+                text = get_amount(crop)
+                amount = text
+
+            elif class_name == "date":
+                text = get_date(crop)
+                date = text
+
+            elif class_name == "bank_address":
+                text = get_bank_address(crop)
+                bank_address = text
+
+            elif class_name == "signature":
+                text = get_signature(crop)
+                signature = text
+
             else:
                 text = ""
 
             ocr_result[class_name] = text
-
             print(class_name, "=>", text)
 
         detection_path = os.path.join(
@@ -172,18 +208,35 @@ async def process_cheque(file: UploadFile = File(...)):
             detection_path,
             cv2.cvtColor(draw_image, cv2.COLOR_RGB2BGR)
         )
+        
+        saved = cv2.imwrite(
+            detection_path,
+            cv2.cvtColor(draw_image, cv2.COLOR_RGB2BGR)
+        )
+
+        print("Image Saved:", saved)
+        print("Path:", os.path.abspath(detection_path))
 
         print("Detection image saved:", detection_path)
 
         return {
-            "success": True,
-            "bankName": bank_name,
-            "ifscCode": ifsc_code,
-            "accountNumber": account_number,
-            "chequeNumber": cheque_number,
-            "ocrResult": ocr_result,
-            "detectionImage": detection_path
-        }
+    "success": True,
+
+    "bankName": bank_name,
+    "ifscCode": ifsc_code,
+    "accountNumber": account_number,
+    "chequeNumber": cheque_number,
+
+    "date": date,
+    "amount": amount,
+    "bankAddress": bank_address,
+    "signature": signature,
+
+    "ocrResult": ocr_result,
+
+    # "detectionImage": detection_path
+    "detectionImage": "/output/detections/detected_cheque.jpg"
+}
 
     except Exception as e:
         return {

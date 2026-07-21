@@ -161,6 +161,27 @@ def get_date(cropped_img):
 
     return ""
 
+def get_bank_address(cropped_img):
+
+    img = preprocess_image(cropped_img)
+
+    text = pytesseract.image_to_string(
+        img,
+        lang="eng",
+        config="--psm 6"
+    )
+
+    return text
+
+def get_signature(cropped_img):
+
+    h, w = cropped_img.shape[:2]
+
+    if h > 20 and w > 20:
+        return "Present"
+
+    return "Not Found"
+
 def get_bank_details(ifsc_code):
 
     if ifsc_code:
