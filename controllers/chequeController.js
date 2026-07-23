@@ -54,9 +54,29 @@ exports.processCheque = async (req, res) => {
 
 function formatDate(value) {
 
-    if (!value || value.length !== 6) return null;
+    if (!value) return null;
 
-    return `20${value.substring(4, 6)}-${value.substring(2, 4)}-${value.substring(0, 2)}`;
+    // Already yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+
+    // dd/mm/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+        const [day, month, year] = value.split("/");
+        return `${year}-${month}-${day}`;
+    }
+
+    // OCR format ddmmyy
+    if (/^\d{6}$/.test(value)) {
+        const day = value.substring(0, 2);
+        const month = value.substring(2, 4);
+        const year = "20" + value.substring(4, 6);
+
+        return `${year}-${month}-${day}`;
+    }
+
+    return null;
 }
 
 exports.createCheque = async (req, res) => {
@@ -65,9 +85,9 @@ exports.createCheque = async (req, res) => {
 
         const cheque = await Cheque.create({
 
-            shop_id: req.body.shopId,
+            shop_id: req.user.shopId,
 
-            created_by: req.body.userId,
+            created_by: req.user.userId,
 
             cheque_type_id: req.body.chequeTypeId,
 
@@ -109,7 +129,7 @@ exports.createCheque = async (req, res) => {
 
             activated_at: new Date(),
 
-            activated_by: req.body.userId,
+            activated_by: req.user.userId,
 
             cleared_by: null,
 
