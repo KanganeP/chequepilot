@@ -63,12 +63,11 @@ const signup = async (req, res) => {
         logo_url,
         subscription_plan,
         is_active,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-        TRUE,NOW(),NOW()
+        TRUE,NOW()
       )
       `,
       [
@@ -108,14 +107,12 @@ const signup = async (req, res) => {
         password_hash,
         role,
         is_active,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,
         'OWNER',
         TRUE,
-        NOW(),
         NOW()
       )
       `,
@@ -141,8 +138,7 @@ const signup = async (req, res) => {
         whatsapp_notification,
         push_notification,
         timezone,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,
@@ -152,7 +148,6 @@ const signup = async (req, res) => {
         FALSE,
         TRUE,
         'Asia/Kolkata',
-        NOW(),
         NOW()
       )
       `,

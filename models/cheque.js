@@ -11,12 +11,7 @@ module.exports = (sequelize, DataTypes) => {
 
             shop_id: {
                 type: DataTypes.UUID,
-                allowNull: true,
-            },
-
-            created_by: {
-                type: DataTypes.UUID,
-                allowNull: true,
+                allowNull: false,
             },
 
             cheque_type_id: {
@@ -66,16 +61,6 @@ module.exports = (sequelize, DataTypes) => {
 
             overdue_days: DataTypes.INTEGER,
 
-            activated_at: DataTypes.DATE,
-
-            activated_by: DataTypes.UUID,
-
-            cleared_by: DataTypes.UUID,
-
-            cleared_at: DataTypes.DATE,
-
-            bounced_reason: DataTypes.TEXT,
-
             is_ocr_verified: {
                 type: DataTypes.BOOLEAN,
                 defaultValue: true,
@@ -86,9 +71,38 @@ module.exports = (sequelize, DataTypes) => {
                 defaultValue: DataTypes.NOW,
             },
 
+            created_by: DataTypes.UUID,
+
+            cleared_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+
+            cleared_by: {
+                type: DataTypes.UUID,
+                allowNull: true,
+            },
+
+            bounced_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+
+            bounced_by: {
+                type: DataTypes.UUID,
+                allowNull: true,
+            },
+
+            bounced_reason: DataTypes.TEXT,
+
             updated_at: {
                 type: DataTypes.DATE,
-                defaultValue: DataTypes.NOW,
+                allowNull: true,
+            },
+
+            updated_by: {
+                type: DataTypes.UUID,
+                allowNull: true,
             },
         },
         {

@@ -87,8 +87,6 @@ exports.createCheque = async (req, res) => {
 
             shop_id: req.user.shopId,
 
-            created_by: req.user.userId,
-
             cheque_type_id: req.body.chequeTypeId,
 
             cheque_category_id: req.body.chequeCategoryId,
@@ -127,21 +125,25 @@ exports.createCheque = async (req, res) => {
 
             overdue_days: 0,
 
-            activated_at: new Date(),
-
-            activated_by: req.user.userId,
-
-            cleared_by: null,
-
-            cleared_at: null,
-
-            bounced_reason: null,
-
             is_ocr_verified: true,
 
             created_at: new Date(),
 
-            updated_at: new Date()
+            created_by: req.user.userId,
+
+            cleared_at: null,
+
+            cleared_by: null,
+
+            bounced_at: null,
+            
+            bounced_by: null,
+
+            bounced_reason: null,
+
+            updated_at: null,
+
+            updated_by: null
         });
 
         res.json({
