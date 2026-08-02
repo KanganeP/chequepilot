@@ -1,6 +1,7 @@
 const pool = require("../db/db");
 const bcrypt = require("bcrypt");
 const { v4: uuidv4 } = require("uuid");
+const jwt = require("jsonwebtoken");
 
 const signup = async (req, res) => {
   const client = await pool.connect();
@@ -62,12 +63,11 @@ const signup = async (req, res) => {
         logo_url,
         subscription_plan,
         is_active,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-        TRUE,NOW(),NOW()
+        TRUE,NOW()
       )
       `,
       [
@@ -107,14 +107,12 @@ const signup = async (req, res) => {
         password_hash,
         role,
         is_active,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,
         'OWNER',
         TRUE,
-        NOW(),
         NOW()
       )
       `,
@@ -140,8 +138,7 @@ const signup = async (req, res) => {
         whatsapp_notification,
         push_notification,
         timezone,
-        created_at,
-        updated_at
+        created_at
       )
       VALUES (
         $1,
@@ -151,7 +148,6 @@ const signup = async (req, res) => {
         FALSE,
         TRUE,
         'Asia/Kolkata',
-        NOW(),
         NOW()
       )
       `,
@@ -205,6 +201,66 @@ const signup = async (req, res) => {
   }
 };
 
+const login = async (req, res) => {
+  try {
+
+    const { email, password } = req.body;
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    const user = result.rows[0];
+
+    const match = await bcrypt.compare(
+      password,
+      user.password_hash
+    );
+
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        shopId: user.shop_id,
+        role: user.role
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRE
+      }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+};
+
 module.exports = {
   signup,
+  login
 };
