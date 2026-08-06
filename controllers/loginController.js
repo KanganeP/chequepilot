@@ -4,7 +4,7 @@ const token = jwt.sign(
     {
         userId: user.id,
         shopId: user.shop_id,
-        role: user.role
+        role: user.role_id
     },
     process.env.JWT_SECRET,
     {

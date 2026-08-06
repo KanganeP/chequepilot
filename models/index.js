@@ -39,4 +39,23 @@ db.Cheque.belongsTo(db.ChequeCategory, {
 db.Cheque.belongsTo(db.ChequeStatus, {
     foreignKey: "cheque_status_id"
 });
+
+db.User = require("./user")(
+    sequelize,
+    Sequelize.DataTypes
+);
+
+db.UserRole = require("./userRole")(
+    sequelize,
+    Sequelize.DataTypes
+);
+
+db.User.belongsTo(db.UserRole, {
+    foreignKey: "role_id"
+});
+
+db.UserRole.hasMany(db.User, {
+    foreignKey: "role_id"
+});
+
 module.exports = db;

@@ -105,13 +105,12 @@ const signup = async (req, res) => {
         email,
         mobile,
         password_hash,
-        role,
+        role_id,
         is_active,
         created_at
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,
-        'OWNER',
+        $1,$2,$3,$4,$5,$6,$7,
         TRUE,
         NOW()
       )
@@ -123,6 +122,7 @@ const signup = async (req, res) => {
         email,
         mobile,
         passwordHash,
+        1, // Assuming 1 is the role ID for owner
       ]
     );
 
@@ -236,7 +236,7 @@ const login = async (req, res) => {
       {
         userId: user.id,
         shopId: user.shop_id,
-        role: user.role
+        role: user.role_id
       },
       process.env.JWT_SECRET,
       {
