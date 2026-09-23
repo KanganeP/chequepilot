@@ -10,7 +10,7 @@ const sequelize = new Sequelize(
         host: process.env.DB_HOST,
         port: process.env.DB_PORT,
         dialect: "postgres",
-        logging: false
+        logging: false,
     }
 );
 
@@ -19,26 +19,33 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-db.Cheque = require("./cheque")(sequelize, Sequelize.DataTypes);
+// =========================
+// Cheque Models
+// =========================
 
-db.ChequeType = require("./chequeType")(sequelize, Sequelize.DataTypes);
+db.Cheque = require("./cheque")(
+    sequelize,
+    Sequelize.DataTypes
+);
 
-db.ChequeCategory = require("./chequeCategory")(sequelize, Sequelize.DataTypes);
+db.ChequeType = require("./chequeType")(
+    sequelize,
+    Sequelize.DataTypes
+);
 
-db.ChequeStatus = require("./chequeStatus")(sequelize, Sequelize.DataTypes);
+db.ChequeCategory = require("./chequeCategory")(
+    sequelize,
+    Sequelize.DataTypes
+);
 
+db.ChequeStatus = require("./chequeStatus")(
+    sequelize,
+    Sequelize.DataTypes
+);
 
-db.Cheque.belongsTo(db.ChequeType, {
-    foreignKey: "cheque_type_id"
-});
-
-db.Cheque.belongsTo(db.ChequeCategory, {
-    foreignKey: "cheque_category_id"
-});
-
-db.Cheque.belongsTo(db.ChequeStatus, {
-    foreignKey: "cheque_status_id"
-});
+// =========================
+// User Models
+// =========================
 
 db.User = require("./user")(
     sequelize,
@@ -50,12 +57,76 @@ db.UserRole = require("./userRole")(
     Sequelize.DataTypes
 );
 
+// =========================
+// Cheque Associations
+// =========================
+
+db.Cheque.belongsTo(db.ChequeType, {
+    foreignKey: "cheque_type_id",
+    as: "type",
+});
+
+db.ChequeType.hasMany(db.Cheque, {
+    foreignKey: "cheque_type_id",
+    as: "cheques",
+});
+
+db.Cheque.belongsTo(db.ChequeCategory, {
+    foreignKey: "cheque_category_id",
+    as: "category",
+});
+
+db.ChequeCategory.hasMany(db.Cheque, {
+    foreignKey: "cheque_category_id",
+    as: "cheques",
+});
+
+db.Cheque.belongsTo(db.ChequeStatus, {
+    foreignKey: "cheque_status_id",
+    as: "status",
+});
+
+db.ChequeStatus.hasMany(db.Cheque, {
+    foreignKey: "cheque_status_id",
+    as: "cheques",
+});
+
+// =========================
+// Cheque User Associations
+// =========================
+
+db.Cheque.belongsTo(db.User, {
+    foreignKey: "created_by",
+    as: "createdBy",
+});
+
+db.Cheque.belongsTo(db.User, {
+    foreignKey: "updated_by",
+    as: "updatedBy",
+});
+
+db.User.hasMany(db.Cheque, {
+    foreignKey: "created_by",
+    as: "createdCheques",
+});
+
+db.User.hasMany(db.Cheque, {
+    foreignKey: "updated_by",
+    as: "updatedCheques",
+});
+
+// =========================
+// User Role Associations
+// =========================
+
 db.User.belongsTo(db.UserRole, {
-    foreignKey: "role_id"
+    foreignKey: "role_id",
 });
 
 db.UserRole.hasMany(db.User, {
-    foreignKey: "role_id"
+    foreignKey: "role_id",
 });
+
+// =========================
 
 module.exports = db;

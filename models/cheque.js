@@ -1,5 +1,4 @@
 module.exports = (sequelize, DataTypes) => {
-
     return sequelize.define(
         "Cheque",
         {
@@ -30,80 +29,48 @@ module.exports = (sequelize, DataTypes) => {
             },
 
             party_name: DataTypes.STRING,
-
             payee_name: DataTypes.STRING,
-
             bank_name: DataTypes.STRING,
-
-            bank_address: DataTypes.STRING,
-
+            bank_address: DataTypes.TEXT,
             cheque_number: DataTypes.STRING,
-
             account_number: DataTypes.STRING,
-
             ifsc_code: DataTypes.STRING,
-
             micr_code: DataTypes.STRING,
 
             amount: DataTypes.DECIMAL(15, 2),
 
             amount_in_words: DataTypes.TEXT,
 
-            cheque_date: DataTypes.DATEONLY,
-
-            clearance_date: DataTypes.DATEONLY,
+            cheque_date: DataTypes.DATE,
+            clearance_date: DataTypes.DATE,
 
             remarks: DataTypes.TEXT,
-
             image_path: DataTypes.TEXT,
-
             ocr_raw_text: DataTypes.TEXT,
 
-            overdue_days: DataTypes.INTEGER,
+            overdue_days: {
+                type: DataTypes.INTEGER,
+                defaultValue: 0,
+            },
 
             is_ocr_verified: {
                 type: DataTypes.BOOLEAN,
-                defaultValue: true,
+                defaultValue: false,
             },
 
-            created_at: {
-                type: DataTypes.DATE,
-                defaultValue: DataTypes.NOW,
-            },
-
+            created_at: DataTypes.DATE,
             created_by: DataTypes.UUID,
 
-            cleared_at: {
-                type: DataTypes.DATE,
-                allowNull: true,
-            },
+            cleared_at: DataTypes.DATE,
+            cleared_by: DataTypes.UUID,
 
-            cleared_by: {
-                type: DataTypes.UUID,
-                allowNull: true,
-            },
-
-            bounced_at: {
-                type: DataTypes.DATE,
-                allowNull: true,
-            },
-
-            bounced_by: {
-                type: DataTypes.UUID,
-                allowNull: true,
-            },
+            bounced_at: DataTypes.DATE,
+            bounced_by: DataTypes.UUID,
 
             bounced_reason: DataTypes.TEXT,
 
-            updated_at: {
-                type: DataTypes.DATE,
-                allowNull: true,
-            },
-
-            updated_by: {
-                type: DataTypes.UUID,
-                allowNull: true,
-            },
+            updated_at: DataTypes.DATE,
+            updated_by: DataTypes.UUID,
         },
         {
             tableName: "cheques",

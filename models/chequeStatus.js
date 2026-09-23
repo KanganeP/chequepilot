@@ -1,27 +1,31 @@
 module.exports = (sequelize, DataTypes) => {
-
     return sequelize.define(
         "ChequeStatus",
         {
             id: {
                 type: DataTypes.INTEGER,
-                primaryKey: true
+                primaryKey: true,
+                autoIncrement: true,
             },
 
-            status_name: DataTypes.STRING,
+            status_name: {
+                type: DataTypes.STRING,
+                allowNull: false,
+            },
 
-            description: DataTypes.TEXT,
+            description: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
 
-            display_order: DataTypes.INTEGER,
-
-            is_active: DataTypes.BOOLEAN,
-
-            created_at: DataTypes.DATE
+            is_active: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: true,
+            },
         },
         {
             tableName: "cheque_statuses",
-            timestamps: false
+            timestamps: false,
         }
     );
-
 };

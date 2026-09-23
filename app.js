@@ -5,6 +5,7 @@ const db = require("./models");;
 const authRoutes = require("./routes/authRoutes");
 const chequeRoutes = require("./routes/chequeRoutes");
 const userRoutes = require("./routes/userRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const app = express();
 
@@ -13,8 +14,10 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/cheque", chequeRoutes);
+// app.use("/api/cheque/pending", chequeRoutes);
 app.use("/api/users/create", userRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 const PORT = process.env.PORT || 3001;
 

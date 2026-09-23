@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
@@ -5,7 +6,8 @@ const {
     Cheque,
     ChequeType,
     ChequeCategory,
-    ChequeStatus
+    ChequeStatus,
+    User
 } = require("../models");
 
 exports.processCheque = async (req, res) => {
@@ -25,7 +27,7 @@ exports.processCheque = async (req, res) => {
         );
         fs.unlinkSync(req.file.path);
         res.json(response.data);
-    }catch (err) {
+    } catch (err) {
         res.status(500).json({
             success: false,
             error: err.message
@@ -59,11 +61,27 @@ function formatDate(value) {
 
 exports.createCheque = async (req, res) => {
     try {
+
+        // Find Pending status
+        const pendingStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: "Pending",
+                is_active: true
+            }
+        });
+
+        if (!pendingStatus) {
+            return res.status(400).json({
+                success: false,
+                message: "Pending cheque status not found"
+            });
+        }
+
         const cheque = await Cheque.create({
             shop_id: req.user.shopId,
             cheque_type_id: req.body.chequeTypeId,
             cheque_category_id: req.body.chequeCategoryId,
-            cheque_status_id: 1, // Pending
+            cheque_status_id: pendingStatus.id,
             party_name: req.body.partyName,
             payee_name: req.body.payeeName,
             bank_name: req.body.bankName,
@@ -139,6 +157,587 @@ exports.getChequeCategories = async (req, res) => {
         res.status(500).json({
             success: false,
             error: err.message
+        });
+    }
+};
+
+exports.getPendingChequesByType = async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        if (!["credit", "debit"].includes(type.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid cheque type. Use credit or debit."
+            });
+        }
+
+        const chequeType = await ChequeType.findOne({
+            where: {
+                type_name: {
+                    [Op.iLike]: type
+                }
+            }
+        });
+
+        if (!chequeType) {
+            return res.status(404).json({
+                success: false,
+                message: `${type} cheque type not found`
+            });
+        }
+
+        const pendingStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "pending"
+                }
+            }
+        });
+
+        if (!pendingStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Pending cheque status not found"
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const cheques = await Cheque.findAll({
+            where: {
+                shop_id: req.user.shopId,
+                cheque_status_id: pendingStatus.id,
+                cheque_type_id: chequeType.id,
+                cheque_date: {
+                    [Op.gte]: today
+                }
+            },
+
+            include: [
+                {
+                    model: ChequeType,
+                    as: "type",
+                    attributes: ["id", "type_name"]
+                },
+                {
+                    model: ChequeStatus,
+                    as: "status",
+                    attributes: ["id", "status_name"]
+                },
+                {
+                    model: User,
+                    as: "createdBy",
+                    attributes: ["id", "full_name"]
+                },
+                {
+                    model: User,
+                    as: "updatedBy",
+                    attributes: ["id", "full_name"]
+                }
+            ],
+
+            order: [["created_at", "DESC"]]
+        });
+
+        const data = cheques.map((cheque) => {
+            const item = cheque.toJSON();
+
+            return {
+                ...item,
+                type_name: item.type?.type_name || null,
+                status_name: item.status?.status_name || null,
+                created_by_name: item.createdBy?.full_name || null,
+                updated_by_name: item.updatedBy?.full_name || null,
+            };
+        });
+
+        return res.json({
+            success: true,
+            count: data.length,
+            data
+        });
+
+    } catch (err) {
+        console.error("Get pending cheques error:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+exports.getClearedChequesByType = async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        const normalizedType = type.toLowerCase();
+
+        if (!["credit", "debit"].includes(normalizedType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid cheque type. Use credit or debit.",
+            });
+        }
+
+        // =========================
+        // Find cheque type
+        // =========================
+
+        const chequeType = await ChequeType.findOne({
+            where: {
+                type_name: {
+                    [Op.iLike]: normalizedType,
+                },
+                is_active: true,
+            },
+        });
+
+        if (!chequeType) {
+            return res.status(404).json({
+                success: false,
+                message: `${type} cheque type not found`,
+            });
+        }
+
+        // =========================
+        // Find Cleared status
+        // =========================
+
+        const clearedStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "cleared",
+                },
+                is_active: true,
+            },
+        });
+
+        if (!clearedStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Cleared cheque status not found",
+            });
+        }
+
+        // =========================
+        // Get cleared cheques
+        // =========================
+
+        const cheques = await Cheque.findAll({
+            where: {
+                shop_id: req.user.shopId,
+
+                // Cleared only
+                cheque_status_id: clearedStatus.id,
+
+                // Credit / Debit
+                cheque_type_id: chequeType.id,
+            },
+
+            include: [
+                {
+                    model: ChequeType,
+                    as: "type",
+                    attributes: ["id", "type_name"],
+                },
+
+                {
+                    model: ChequeStatus,
+                    as: "status",
+                    attributes: ["id", "status_name"],
+                },
+
+                {
+                    model: User,
+                    as: "createdBy",
+                    attributes: ["id", "full_name"],
+                },
+
+                {
+                    model: User,
+                    as: "updatedBy",
+                    attributes: ["id", "full_name"],
+                },
+            ],
+
+            order: [["cleared_at", "DESC"]],
+        });
+
+        // =========================
+        // Format response
+        // =========================
+
+        const data = cheques.map((cheque) => {
+            const item = cheque.toJSON();
+
+            return {
+                ...item,
+
+                type_name: item.type?.type_name || null,
+
+                status_name: item.status?.status_name || null,
+
+                created_by_name:
+                    item.createdBy?.full_name || null,
+
+                updated_by_name:
+                    item.updatedBy?.full_name || null,
+            };
+        });
+
+        return res.json({
+            success: true,
+            count: data.length,
+            data,
+        });
+
+    } catch (err) {
+        console.error("Get cleared cheques error:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
+exports.getOverdueChequesByType = async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        const normalizedType = type.toLowerCase();
+
+        if (!["credit", "debit"].includes(normalizedType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid cheque type. Use credit or debit."
+            });
+        }
+
+        const chequeType = await ChequeType.findOne({
+            where: {
+                type_name: {
+                    [Op.iLike]: normalizedType
+                },
+                is_active: true
+            }
+        });
+
+        if (!chequeType) {
+            return res.status(404).json({
+                success: false,
+                message: `${type} cheque type not found`
+            });
+        }
+
+        const pendingStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "pending"
+                },
+                is_active: true
+            }
+        });
+
+        if (!pendingStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Pending cheque status not found"
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const cheques = await Cheque.findAll({
+            where: {
+                shop_id: req.user.shopId,
+                cheque_status_id: pendingStatus.id,
+                cheque_type_id: chequeType.id,
+                cheque_date: {
+                    [Op.lt]: today
+                }
+            },
+
+            include: [
+                {
+                    model: ChequeType,
+                    as: "type",
+                    attributes: ["id", "type_name"]
+                },
+                {
+                    model: ChequeStatus,
+                    as: "status",
+                    attributes: ["id", "status_name"]
+                },
+                {
+                    model: User,
+                    as: "createdBy",
+                    attributes: ["id", "full_name"]
+                },
+                {
+                    model: User,
+                    as: "updatedBy",
+                    attributes: ["id", "full_name"]
+                }
+            ],
+
+            order: [["cheque_date", "ASC"]]
+        });
+
+        const data = cheques.map((cheque) => {
+            const item = cheque.toJSON();
+
+            return {
+                ...item,
+
+                type_name: item.type?.type_name || null,
+                status_name: item.status?.status_name || null,
+
+                created_by_name:
+                    item.createdBy?.full_name || null,
+
+                updated_by_name:
+                    item.updatedBy?.full_name || null
+            };
+        });
+
+        return res.json({
+            success: true,
+            count: data.length,
+            data
+        });
+
+    } catch (err) {
+        console.error("Get overdue cheques error:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+exports.clearCheque = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find cheque belonging to logged-in shop
+        const cheque = await Cheque.findOne({
+            where: {
+                id,
+                shop_id: req.user.shopId
+            }
+        });
+
+        if (!cheque) {
+            return res.status(404).json({
+                success: false,
+                message: "Cheque not found"
+            });
+        }
+
+        // Find Cleared status dynamically
+        const clearedStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "Cleared"
+                },
+                is_active: true
+            }
+        });
+
+        if (!clearedStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Cleared cheque status not found"
+            });
+        }
+
+        const now = new Date();
+
+        // Update cheque status
+        await cheque.update({
+            cheque_status_id: clearedStatus.id,
+            cleared_at: now,
+            cleared_by: req.user.userId,
+            updated_at: now,
+            updated_by: req.user.userId
+        });
+
+        return res.json({
+            success: true,
+            message: "Cheque marked as cleared successfully",
+            data: cheque
+        });
+
+    } catch (err) {
+        console.error("Clear cheque error:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+exports.bounceCheque = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { bouncedReason } = req.body;
+
+        const cheque = await Cheque.findOne({
+            where: {
+                id,
+                shop_id: req.user.shopId,
+            },
+        });
+
+        if (!cheque) {
+            return res.status(404).json({
+                success: false,
+                message: "Cheque not found.",
+            });
+        }
+
+        const bouncedStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "bounced",
+                },
+                is_active: true,
+            },
+        });
+
+        if (!bouncedStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Bounced status not found.",
+            });
+        }
+
+        const now = new Date();
+
+        await cheque.update({
+            cheque_status_id: bouncedStatus.id,
+            bounced_at: now,
+            bounced_by: req.user.userId,
+            bounced_reason: bouncedReason || null,
+            updated_at: now,
+            updated_by: req.user.userId,
+        });
+
+        return res.json({
+            success: true,
+            message: "Cheque marked as bounced successfully.",
+            data: cheque,
+        });
+
+    } catch (error) {
+        console.error("Bounce cheque error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to mark cheque as bounced.",
+        });
+    }
+};
+
+exports.getBouncedChequesByType = async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        const chequeType = await ChequeType.findOne({
+            where: {
+                type_name: {
+                    [Op.iLike]: type,
+                },
+                is_active: true,
+            },
+        });
+
+        if (!chequeType) {
+            return res.status(404).json({
+                success: false,
+                message: `Cheque type '${type}' not found.`,
+            });
+        }
+
+        const bouncedStatus = await ChequeStatus.findOne({
+            where: {
+                status_name: {
+                    [Op.iLike]: "bounced",
+                },
+                is_active: true,
+            },
+        });
+
+        if (!bouncedStatus) {
+            return res.status(404).json({
+                success: false,
+                message: "Bounced status not found.",
+            });
+        }
+
+        const cheques = await Cheque.findAll({
+            where: {
+                shop_id: req.user.shopId,
+                cheque_status_id: bouncedStatus.id,
+                cheque_type_id: chequeType.id,
+            },
+
+            include: [
+                {
+                    model: ChequeType,
+                    as: "type",
+                    attributes: ["id", "type_name"],
+                },
+                {
+                    model: ChequeStatus,
+                    as: "status",
+                    attributes: ["id", "status_name"],
+                },
+                {
+                    model: User,
+                    as: "createdBy",
+                    attributes: ["id", "full_name"],
+                },
+                {
+                    model: User,
+                    as: "updatedBy",
+                    attributes: ["id", "full_name"],
+                },
+            ],
+
+            order: [["bounced_at", "DESC"]],
+        });
+
+        const data = cheques.map((c) => {
+            const item = c.toJSON();
+
+            return {
+                ...item,
+                type_name: c.type?.type_name || null,
+                status_name: "Bounced",
+                created_by_name: c.createdBy?.full_name || null,
+                updated_by_name: c.updatedBy?.full_name || null,
+            };
+        });
+
+        return res.json({
+            success: true,
+            data,
+        });
+
+    } catch (error) {
+        console.error("Get bounced cheques error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch bounced cheques.",
         });
     }
 };
